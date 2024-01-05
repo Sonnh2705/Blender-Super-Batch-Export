@@ -290,9 +290,7 @@ class EXPORT_MESH_OT_batch(Operator):
             for obj in objects:
                 if not obj.type in settings.object_types:
                     continue
-                # bpy.ops.object.select_all(action='DESELECT')
                 obj.select_set(True)
-                print(obj.name)
             self.export_selection(settings.file_name, context, base_dir)
 
         elif settings.mode == 'COLLECTIONS':
