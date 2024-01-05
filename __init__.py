@@ -6,7 +6,7 @@ import os
 bl_info = {
     "name": "Super Batch Export",
     "author": "Original: MrTriPie| Forked by SonNH",
-    "version": (2, 1, 1),
+    "version": (2, 1, 2),
     "blender": (3, 3, 0),
     "category": "Import-Export",
     "location": "Set in preferences below. Default: Top Bar (After File, Edit, ...Help)",
