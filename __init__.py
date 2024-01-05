@@ -5,7 +5,7 @@ import os
 
 bl_info = {
     "name": "Super Batch Export",
-    "author": "MrTriPie",
+    "author": "Original: MrTriPie| Forked by SonNH",
     "version": (2, 1, 1),
     "blender": (3, 3, 0),
     "category": "Import-Export",
@@ -24,6 +24,8 @@ preset_enum_items_refs = {}
 
 # Returns a list of tuples used for an EnumProperty's items (identifier, name, description)
 # identifier, and name are the file name of the preset without the file extension (.py)
+
+
 def get_operator_presets(operator):
     presets = [('NO_PRESET', "(no preset)", "", 0)]
     for d in bpy.utils.script_paths(subdir="presets/operator/" + operator):
@@ -42,6 +44,8 @@ def get_operator_presets(operator):
 # in the method's arguments to set the arguments from that dictionary's
 # key: value pairs. Example:
 # bpy.ops.category.operator(**options)
+
+
 def load_operator_preset(operator, preset):
     options = {}
     if preset == 'NO_PRESET':
@@ -69,6 +73,8 @@ def load_operator_preset(operator, preset):
 # Finds the index of a preset with preset_name and returns it
 # Useful for transferring the value of a saved preset (in a StringProperty)
 # to the NOT saved EnumProperty for that preset used to present a nice GUI.
+
+
 def get_preset_index(operator, preset_name):
     for p in range(len(preset_enum_items_refs[operator])):
         if preset_enum_items_refs[operator][p][0] == preset_name:
@@ -77,6 +83,8 @@ def get_preset_index(operator, preset_name):
 
 # Draws the .blend file specific settings used in the
 # Popover panel or Side Panel panel
+
+
 def draw_settings(self, context):
     self.layout.use_property_split = True
     self.layout.use_property_decorate = False
@@ -89,6 +97,11 @@ def draw_settings(self, context):
     col.prop(settings, 'directory')
     col.prop(settings, 'prefix')
     col.prop(settings, 'suffix')
+
+    if settings.mode == 'ONE FILE':
+        col.prop(settings, 'use_custom_name')
+    if settings.use_custom_name:
+        col.prop(settings, 'file_name')
 
     self.layout.separator()
     col = self.layout.column(align=True)
@@ -150,6 +163,8 @@ def draw_settings(self, context):
 
 # Draws the button and popover dropdown button used in the
 # 3D Viewport Header or Top Bar
+
+
 def draw_popover(self, context):
     row = self.layout.row()
     row = row.row(align=True)
@@ -157,6 +172,8 @@ def draw_popover(self, context):
     row.popover(panel='POPOVER_PT_batch_export', text='')
 
 # Side Panel panel (used with Side Panel option)
+
+
 class VIEW3D_PT_batch_export(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -167,6 +184,8 @@ class VIEW3D_PT_batch_export(Panel):
         draw_settings(self, context)
 
 # Popover panel (used on 3D Viewport Header or Top Bar option)
+
+
 class POPOVER_PT_batch_export(Panel):
     bl_space_type = 'TOPBAR'
     bl_region_type = 'HEADER'
@@ -176,6 +195,8 @@ class POPOVER_PT_batch_export(Panel):
         draw_settings(self, context)
 
 # Addon settings that are NOT specific to a .blend file
+
+
 class BatchExportPreferences(AddonPreferences):
     bl_idname = __name__
 
@@ -209,6 +230,8 @@ class BatchExportPreferences(AddonPreferences):
         self.layout.prop(self, "addon_location")
 
 # Operator called when pressing the batch export button.
+
+
 class EXPORT_MESH_OT_batch(Operator):
     """Export many objects to seperate files all at once"""
     bl_idname = "export_mesh.batch"
@@ -230,7 +253,7 @@ class EXPORT_MESH_OT_batch(Operator):
             self.report({'ERROR'}, "Export directory doesn't exist")
             return {'FINISHED'}
 
-        self.file_count = 0
+        # self.file_count = 0
 
         view_layer = context.view_layer
         obj_active = view_layer.objects.active
@@ -262,6 +285,15 @@ class EXPORT_MESH_OT_batch(Operator):
                 self.select_children_recursive(obj, context,)
                 if context.selected_objects:
                     self.export_selection(obj.name, context, base_dir)
+
+        elif settings.mode == 'ONE FILE':
+            for obj in objects:
+                if not obj.type in settings.object_types:
+                    continue
+                # bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                print(obj.name)
+            self.export_selection(settings.file_name, context, base_dir)
 
         elif settings.mode == 'COLLECTIONS':
             for col in bpy.data.collections.values():
@@ -324,7 +356,10 @@ class EXPORT_MESH_OT_batch(Operator):
 
         prefix = settings.prefix
         suffix = settings.suffix
-        name = prefix + bpy.path.clean_name(itemname) + suffix
+        if not settings.use_custom_name:
+            name = prefix + bpy.path.clean_name(itemname) + suffix
+        else:
+            name = prefix + bpy.path.clean_name(settings.file_name) + suffix
         fp = os.path.join(base_dir, name)
 
         # Export
@@ -419,13 +454,29 @@ class EXPORT_MESH_OT_batch(Operator):
         self.file_count += 1
 
 # Groups together all the addon settings that are saved in each .blend file
+
+
 class BatchExportSettings(PropertyGroup):
+
+    def on_mode_update(self, context):
+        if self.mode != 'ONE FILE':
+            self.use_custom_name = False
+
     # File Settings:
     directory: StringProperty(
         name="Directory",
         description="Which folder to place the exported files\nDefault of // will export to same directory as the blend file (only works if the blend file is saved)",
         default="//",
         subtype='DIR_PATH',
+    )
+    use_custom_name: BoolProperty(
+        name='Custom file name',
+        default=False,
+        description='Use custom name for exported files'
+    )
+    file_name: StringProperty(
+        name="File name",
+        description="Text to use as custom file name",
     )
     prefix: StringProperty(
         name="Prefix",
@@ -462,10 +513,12 @@ class BatchExportSettings(PropertyGroup):
             ("OBJECTS", "Objects", "Each object is exported to its own file", 1),
             ("OBJECT_PARENTS", "Objects by Parents",
              "Same as 'Objects', but objects that are parents have their\nchildren exported with them instead of by themselves", 2),
+            ("ONE FILE", "One file", "Export everything in 1 object", 3),
             ("COLLECTIONS", "Collections",
-             "Each collection is exported into its own file", 3),
+             "Each collection is exported into its own file", 4),
         ],
         default="OBJECT_PARENTS",
+        update=on_mode_update
     )
     limit: EnumProperty(
         name="Limit to",
@@ -568,13 +621,13 @@ class BatchExportSettings(PropertyGroup):
         name="Frame Start",
         min=0,
         description="First frame to export",
-        default = 1,
+        default=1,
     )
     frame_end: IntProperty(
         name="Frame End",
         min=0,
         description="Last frame to export",
-        default = 1,
+        default=1,
     )
     object_types: EnumProperty(
         name="Object Types",
