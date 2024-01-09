@@ -357,7 +357,7 @@ class EXPORT_MESH_OT_batch(Operator):
         if not settings.use_custom_name:
             name = prefix + bpy.path.clean_name(itemname) + suffix
         else:
-            name = prefix + bpy.path.clean_name(settings.file_name) + suffix
+            name = prefix + settings.file_name + suffix
         fp = os.path.join(base_dir, name)
 
         # Export
